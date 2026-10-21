@@ -71,6 +71,10 @@ void PixelDocs::openGroup(const std::string& group,bool open) {
     auto groups=groupsOf(mineCTopics());
     for(size_t g=0;g<groups.size();++g) if(groups[g]==group) open_[g]=open;
 }
+float PixelDocs::treeWidth(float width,float v) {
+    // A third of the window, at most 150 virtual pixels, and never narrower than its title.
+    return std::max(std::min(150*v,width*0.32f),static_cast<float>(12+pixelfont::width("REFERENCE"))*v);
+}
 void PixelDocs::ui(float width,float height) {
     const auto& topics=mineCTopics(); const auto groups=groupsOf(topics);
     ImGui::SetNextWindowPos({0,0}); ImGui::SetNextWindowSize({width,height});
@@ -93,7 +97,7 @@ void PixelDocs::ui(float width,float height) {
     };
     R(0,0,width,height,backdrop);
     // ---- the topic tree
-    const float pad=6*v,treeW=std::min(150*v,width*0.32f);
+    const float pad=6*v,treeW=treeWidth(width,v);
     panel(pad,pad,treeW,height-2*pad);
     pixelfont::draw(d,{pad+9*v,pad+5*v},v,yellow,"REFERENCE");
     const float row=11*v,treeTop=pad+16*v,treeBottom=height-pad-4*v;
@@ -181,8 +185,20 @@ void PixelDocs::ui(float width,float height) {
             if(!b.empty() && b.back()=='|') b.pop_back();
             float colW=std::min(110*v,textW*0.38f);
             float y0=y;
-            if(ascii(a)) {bool ib=false; drawCodeLine(d,{left+2*v,y+v},v,a,ib,cc);} else d->AddText(jp,body,{left+2*v,y},sky,a.c_str());
-            para(left+colW,b,silver);
+            // A left cell wider than its column (a narrow page) puts the description on the next line,
+            // indented; a code cell wider than the whole page breaks at its spaces.
+            auto width=[&](const std::string& t){return ascii(t)?static_cast<float>(pixelfont::width(t))*v:jp->CalcTextSizeA(body,1e9f,0,t.c_str()).x;};
+            const bool stacked=2*v+width(a)+4*v>colW;
+            std::vector<std::string> cells{a};
+            if(stacked && ascii(a) && 2*v+width(a)>textW) {
+                cells.clear(); std::istringstream words(a); std::string word,run;
+                while(words>>word) {std::string t=run.empty()?word:run+" "+word; if(!run.empty() && 2*v+width(t)>textW) {cells.push_back(run); run=word;} else run=t;}
+                if(!run.empty()) cells.push_back(run);
+            }
+            float cy=y;
+            for(const auto& c:cells) {if(ascii(c)) {bool ib=false; drawCodeLine(d,{left+2*v,cy+v},v,c,ib,cc);} else d->AddText(jp,body,{left+2*v,cy},sky,c.c_str()); cy+=11*v;}
+            if(stacked) {y=cy; para(left+12*v,b,silver);}
+            else para(left+colW,b,silver);
             y=std::max(y,y0+10*v)+v; R(left,y-v,textW,std::max(1.0f,v*0.5f),rgb(0x1D2B53));
             continue;
         }

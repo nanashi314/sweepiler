@@ -21,7 +21,7 @@ void PixelDocs::render() {
     openSample=user;
     // BACK at the right of the tree's title, sized like the reference's own
     // buttons; where the tree is too narrow for both (phones), at its foot.
-    const float v=width>=1500 && height>=900?3.0f:2.0f,pad=6*v,treeW=std::min(150*v,width*0.32f);
+    const float v=width>=1500 && height>=900?3.0f:2.0f,pad=6*v,treeW=treeWidth(width,v);
     const float w=30*v,h=11*v,x=treeW>=110*v?pad+treeW-38*v:pad+(treeW-w)/2,y=treeW>=110*v?pad+4*v:height-pad-h-6*v;
     ImGui::SetNextWindowPos({x,y}); ImGui::SetNextWindowSize({w+v,h+v});
     ImGui::Begin("##docsback",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoBackground);

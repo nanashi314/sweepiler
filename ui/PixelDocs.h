@@ -30,6 +30,8 @@ public:
     void drawHere(float width,float height,float pixel=0) {pixel_=pixel; ui(width,height); pixel_=0;}
     void setScroll(float scroll) {scroll_=scroll; scrolledFor_=topic_;}
     void openGroup(const std::string& group,bool open);
+    // The topic tree's width in a window `width` wide, at `v` screen pixels per virtual pixel.
+    static float treeWidth(float width,float v);
     std::function<void(const std::string&)> openSample;   // "open in editor"
     // Messages for the window (used by its window procedure).
     long long handle(void* hwnd,unsigned msg,unsigned long long w,long long l);
