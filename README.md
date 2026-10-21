@@ -8,6 +8,10 @@
 
 ![盤面で動くゲーム](docs/images/games.gif)
 
+**紹介動画（3分）：** https://youtu.be/Zcn9_PmPGkk
+
+[![sweepilerの紹介動画](https://img.youtube.com/vi/Zcn9_PmPGkk/hqdefault.jpg)](https://youtu.be/Zcn9_PmPGkk)
+
 ## どういうもの？
 
 マインスイーパの数字をうまく並べると、論理回路（NORゲート）が作れることが知られています。sweepilerは、それを使ってプログラムを盤面にする「コンパイラ」です。
