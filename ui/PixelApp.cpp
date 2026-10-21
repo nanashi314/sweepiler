@@ -333,11 +333,29 @@ void PixelApp::code(float x,float y,float w,float h) {
         }
     }
     if(button("##ref",next(26),y+1,26,12,"REF",sky,black) && docs_) docs_->open();
+    // Text size: - and +, Ctrl + wheel over the editor, Ctrl + "+", "-" and "0" (back to the default),
+    // in quarter steps from one less than the screen's scale. Off whole numbers the font's pixels are
+    // not all the same width on screens of ordinary density.
+    const float top=y+16,bottom=y+h-11;
+    if(button("##smaller",next(14),y+1,14,12,"-",silver,black)) --codeZoom_;
+    if(button("##larger",next(14),y+1,14,12,"+",silver,black)) ++codeZoom_;
+    auto& io=ImGui::GetIO();
+    if(io.KeyCtrl) {
+        const ImVec2 m=io.MousePos,a=at(x,top),b=at(x+w,bottom);
+        if(m.x>=a.x && m.x<b.x && m.y>=a.y && m.y<b.y && io.MouseWheel!=0) {
+            zoomWheel_+=io.MouseWheel; io.MouseWheel=0;   // the editor does not scroll as well
+            if(std::fabs(zoomWheel_)>=1) {codeZoom_+=zoomWheel_>0?1:-1; zoomWheel_=0;}
+        }
+        if(ImGui::IsKeyPressed(ImGuiKey_Equal) || ImGui::IsKeyPressed(ImGuiKey_Semicolon) || ImGui::IsKeyPressed(ImGuiKey_KeypadAdd)) ++codeZoom_;
+        if(ImGui::IsKeyPressed(ImGuiKey_Minus) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract)) --codeZoom_;
+        if(ImGui::IsKeyPressed(ImGuiKey_0,false) || ImGui::IsKeyPressed(ImGuiKey_Keypad0,false)) codeZoom_=0;
+    }
+    const float base=std::max(1.0f,scale_-1);
+    codeZoom_=std::clamp(codeZoom_,static_cast<int>(std::ceil((1-base)*4)),static_cast<int>(std::floor((8-base)*4)));
     bx=x+w-42;
     bool run=button("##run",bx,y+1,42,12,"RUN \x05",green,black,!session_.status().building);
-    // The editor: pixel font at a whole-number scale, highlighted, with completion.
-    const float top=y+16,bottom=y+h-11;
-    const float fontScale=std::max(1.0f,scale_-1);
+    // The editor: the pixel font, highlighted, with completion.
+    const float fontScale=base+0.25f*static_cast<float>(codeZoom_);
     if(samples_) samplePicker(x,top,w,bottom-top);
     else {
         ImVec2 a=at(x,top),b=at(x+w,bottom); areas_.editor={a.x,a.y,b.x,b.y};

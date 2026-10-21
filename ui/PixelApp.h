@@ -74,6 +74,8 @@ private:
     std::string codeName_{"untitled"};
     std::optional<std::filesystem::path> codePath_;
     bool dirty_{};
+    int codeZoom_{};                 // text size, in quarter steps from the default
+    float zoomWheel_{};              // Ctrl + wheel, until it makes a whole step
     std::string error_;
     int errorLine_{};
     class PixelDocs* docs_{};
