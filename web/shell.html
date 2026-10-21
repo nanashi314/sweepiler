@@ -7,7 +7,8 @@
 <script src="coi-serviceworker.js"></script>
 <style>
 html,body{margin:0;height:100%;overflow:hidden;background:#10162B}
-canvas{display:block;width:100vw;height:100vh;outline:none;touch-action:none}
+/* dvh: the height actually visible. iPhone Safari's vh counts the space under its toolbar. */
+canvas{display:block;width:100vw;height:100vh;height:100dvh;outline:none;touch-action:none}
 #status{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#C2C3C7;font:16px monospace;white-space:pre;text-align:center}
 input.open{position:fixed;display:none;margin:0;padding:0;opacity:0;cursor:pointer}
 #keys{position:fixed;left:0;top:0;width:1px;height:1px;margin:0;padding:0;border:0;opacity:0;resize:none;font-size:16px}
@@ -104,6 +105,8 @@ function onTouch(e){
   var t=e.touches;
   if(e.type==='touchstart'){
     if(t.length===1){
+      // SDL takes mouse input only after the pointer has entered the canvas, which a finger never does.
+      canvas.dispatchEvent(new MouseEvent('mouseenter',{clientX:t[0].clientX,clientY:t[0].clientY}));
       var c=t[0],started;
       started=touch={id:c.identifier,x0:c.clientX,y0:c.clientY,x:c.clientX,y:c.clientY,lastY:c.clientY,mode:touchMode(c.clientX,c.clientY),scrolling:false,acc:0,down:false,pending:true,pinch:0};
       // The pointer goes there first and presses a frame later: in one frame
