@@ -23,6 +23,8 @@ public:
     void openSample(const std::string& label);
     // What NEW does: an untitled MineC program with this text, in the editor.
     void newCode(const std::string& text);
+    // What OPEN does with the chosen file: its text in the editor.
+    void openCodeFile(const std::filesystem::path& path);
     // For automated runs: types text at the end of the code, as if from the keyboard.
     void showSamples() {tab_=2; samples_=true;}
     // For recording: a fixed scale and origin of the virtual screen, the board camera and the editor.

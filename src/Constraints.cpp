@@ -1,5 +1,7 @@
 #include "Constraints.h"
+#ifndef IMS_NO_Z3
 #include <z3++.h>
+#endif
 #include <chrono>
 #include <algorithm>
 #include <numeric>
@@ -68,6 +70,10 @@ std::string verifyModel(const Problem& p,const std::vector<uint16_t>& values) {
 SolveResult solve(const Problem& p,std::stop_token stop) {
     static const auto ordinary=RuleTable::classic();
     if(p.compactClassic && p.rules.symbols==ordinary.symbols && p.rules.counts==ordinary.counts) return solveClassic(p,stop);
+#ifdef IMS_NO_Z3
+    // Builds without Z3 (the web build) solve by ordinary deductions only.
+    SolveResult none; none.status=SolveStatus::Error; none.message="Z3 is not part of this build"; return none;
+#else
     using Clock=std::chrono::steady_clock;
     auto start=Clock::now(); SolveResult result;
     auto elapsed=[&] { return std::chrono::duration<double,std::milli>(Clock::now()-start).count(); };
@@ -213,5 +219,6 @@ SolveResult solve(const Problem& p,std::stop_token stop) {
         result.labels.clear();
         return done(stop.stop_requested()?SolveStatus::Cancelled:SolveStatus::Error,e.what());
     }
+#endif
 }
 }

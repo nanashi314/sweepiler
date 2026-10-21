@@ -1,5 +1,7 @@
 #include "Constraints.h"
+#ifndef IMS_NO_Z3
 #include <z3++.h>
+#endif
 #include <algorithm>
 #include <chrono>
 #include <stdexcept>
@@ -13,6 +15,10 @@ SolveResult solveClassic(const Problem& p,std::stop_token stop) {
     auto done=[&](SolveStatus s,std::string message){r.status=s; r.message=std::move(message); r.elapsedMs=elapsed(); return r;};
     if(auto error=makeLayout(p,r.layout);!error.empty()) return done(SolveStatus::Invalid,error);
     if(stop.stop_requested()) return done(SolveStatus::Cancelled,"Cancelled");
+#ifdef IMS_NO_Z3
+    // Builds without Z3 (the web build) solve by ordinary deductions only.
+    return done(SolveStatus::Error,"Z3 is not part of this build");
+#else
     try {
         z3::context ctx; std::stop_callback interrupt(stop,[&ctx]{ctx.interrupt();}); z3::solver solver(ctx);
         auto guard=[&]{if(stop.stop_requested()) throw SolveStatus::Cancelled; if(elapsed()>=p.timeoutMs) throw SolveStatus::Unknown;};
@@ -140,5 +146,6 @@ SolveResult solveClassic(const Problem& p,std::stop_token stop) {
         guard(); r.modelChecked=true; return done(SolveStatus::Sat,"One checked ordinary model; uniqueness not tested");
     } catch(SolveStatus status) { r.labels.clear(); return done(status,status==SolveStatus::Cancelled?"Cancelled":"Time budget exhausted"); }
       catch(const std::exception& e) { r.labels.clear(); return done(stop.stop_requested()?SolveStatus::Cancelled:SolveStatus::Error,e.what()); }
+#endif
 }
 }

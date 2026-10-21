@@ -59,6 +59,11 @@ void PixelApp::loadCode(size_t program) {
 void PixelApp::openSample(const std::string& label) {
     for(size_t i=0;i<programs_.size();++i) if(programs_[i].label==label) {choice_=i; file_.reset(); loadCode(i); tab_=2; samples_=false; editor_.focus();}
 }
+void PixelApp::openCodeFile(const std::filesystem::path& f) {
+    tab_=2;
+    try {editor_.setText(readTextFile(f)); codePath_=f; codeName_=f.stem().string(); codeLanguage_=f.extension()==".imsg"?ims::ProgramLanguage::Imsg:ims::ProgramLanguage::MineC; dirty_=false; error_.clear(); errorLine_=0; samples_=false;}
+    catch(const std::exception& e) {error_=e.what();}
+}
 bool PixelApp::runCodeFile(const std::filesystem::path& path) {
     editor_.setText(readTextFile(path)); codePath_=path; codeName_=path.stem().string(); dirty_=false;
     codeLanguage_=path.extension()==".imsg"?ims::ProgramLanguage::Imsg:ims::ProgramLanguage::MineC;
@@ -312,12 +317,7 @@ void PixelApp::code(float x,float y,float w,float h) {
     auto next=[&](float width){float at_=bx; bx+=width+2; return at_;};
     if(button("##new",next(26),y+1,26,12,"NEW",silver,black)) newCode(newProgram);
     if(button("##samples",next(46),y+1,46,12,"SAMPLES",samples_?yellow:orange,black)) samples_=!samples_;
-    if(button("##open",next(30),y+1,30,12,"OPEN",silver,black)) {
-        if(auto f=openProgramDialog()) {
-            try {editor_.setText(readTextFile(*f)); codePath_=f; codeName_=f->stem().string(); codeLanguage_=f->extension()==".imsg"?ims::ProgramLanguage::Imsg:ims::ProgramLanguage::MineC; dirty_=false; error_.clear(); errorLine_=0; samples_=false;}
-            catch(const std::exception& e) {error_=e.what();}
-        }
-    }
+    if(button("##open",next(30),y+1,30,12,"OPEN",silver,black)) {if(auto f=openProgramDialog()) openCodeFile(*f);}
     if(button("##save",next(30),y+1,30,12,"SAVE",silver,black)) {
         auto target=codePath_?codePath_:saveProgramDialog(codeName_+(codeLanguage_==ims::ProgramLanguage::Imsg?".imsg":".mc"));
         if(target) {

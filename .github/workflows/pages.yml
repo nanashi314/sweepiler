@@ -1,0 +1,40 @@
+# Builds the web version (web/, Emscripten) with every sample's frame and
+# publishes it on GitHub Pages. Run by hand from the Actions tab.
+name: Web build on GitHub Pages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.13
+      - name: Build the page and frame_tool
+        run: |
+          emcmake cmake -S web -B build-web -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-web -j 4
+      - name: Lay out every sample (frame_tool under Node, about two minutes)
+        run: cmake --build build-web --target web_frames
+      - name: Collect the site
+        run: cmake --build build-web --target web_site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build-web/site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -253,11 +253,13 @@ std::optional<MachineFrame> loadFrame(const std::filesystem::path& path,const Fr
     if(!in || f.stateIn.size()!=circuit.stateBits || f.keys.size()!=circuit.keys.size()) return std::nullopt;
     return f;
 }
+std::function<bool(const std::filesystem::path&)> fetchMissingFrame;
 MachineFrame obtainFrame(const FrameCircuit& circuit,const FrameOptions& o,const std::filesystem::path& cacheDir) {
     std::string stem; for(char c:circuit.name) stem+=std::isalnum(static_cast<unsigned char>(c))?static_cast<char>(std::tolower(static_cast<unsigned char>(c))):'-';
     char key[20]; std::snprintf(key,sizeof(key),"%016llx",static_cast<unsigned long long>(frameKey(circuit,o)));
     auto path=cacheDir/(stem+"-"+key+".frame");
     if(auto f=loadFrame(path,circuit,o)) return std::move(*f);
+    if(fetchMissingFrame && fetchMissingFrame(path)) if(auto f=loadFrame(path,circuit,o)) return std::move(*f);
     auto f=layoutFrame(circuit,o);
     try {saveFrame(path,f,o);} catch(const std::exception&) {}
     return f;

@@ -58,7 +58,11 @@ public:
     // Calls f with the machine under the session lock (nothing if not ready).
     void withMachine(const std::function<void(const FrameMachine&)>& f) const;
     static constexpr size_t maxKeys=8;
+#ifdef __EMSCRIPTEN__
+    static constexpr size_t keptFrameBytes=size_t{1}<<27;   // in the browser, everything shares 4 GB of address space
+#else
     static constexpr size_t keptFrameBytes=size_t{1}<<30;   // memory for past frames on the board
+#endif
 private:
     void tickLoop(std::stop_token stop);
     std::vector<uint8_t> takeKeys();

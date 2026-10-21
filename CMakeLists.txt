@@ -18,7 +18,7 @@ target_include_directories(core PUBLIC src)
 target_link_libraries(core PRIVATE Z3::z3)
 target_compile_options(core PRIVATE /W4 /permissive- /utf-8)
 # sweepiler: the app, a pixel-art UI on the core (ui/).
-add_executable(sweepiler WIN32 ui/LabMain.cpp ui/LabCommon.cpp ui/PixelApp.cpp ui/PixelFont.cpp ui/PixelEditor.cpp ui/PixelDocs.cpp ui/MineCDocs.cpp)
+add_executable(sweepiler WIN32 ui/LabMain.cpp ui/LabCommon.cpp ui/LabWin32.cpp ui/PixelApp.cpp ui/PixelFont.cpp ui/PixelEditor.cpp ui/PixelDocs.cpp ui/PixelDocsWin32.cpp ui/MineCDocs.cpp)
 target_include_directories(sweepiler PRIVATE ui)
 target_link_libraries(sweepiler PRIVATE core imgui d3d11 dxgi comdlg32)
 target_compile_options(sweepiler PRIVATE /W4 /permissive- /utf-8)

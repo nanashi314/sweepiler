@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sweepiler</title>
+<script src="coi-serviceworker.js"></script>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#10162B}
+canvas{display:block;width:100vw;height:100vh;outline:none}
+#status{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#C2C3C7;font:16px monospace;white-space:pre;text-align:center}
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+<div id="status">LOADING...</div>
+<script>
+var statusBox=document.getElementById('status');
+var Module={
+  canvas:document.getElementById('canvas'),
+  setStatus:function(text){if(statusBox && text) statusBox.textContent=text.toUpperCase();},
+  onAbort:function(what){if(statusBox) statusBox.textContent='STOPPED: '+what;}
+};
+// The session runs on Web Workers sharing memory, which needs cross-origin
+// isolation; coi-serviceworker.js provides it on hosts without the headers
+// (it reloads the page once). Until then the program is not started.
+if(self.crossOriginIsolated) {var script=document.createElement('script'); script.src='sweepiler.js'; script.async=true; document.body.appendChild(script);}
+else statusBox.textContent='PREPARING THE PAGE (CROSS-ORIGIN ISOLATION)...';
+// SDL learns where the mouse is only from mousemove: a click or wheel with no
+// move before it (a script, some pens) gets one first, so it acts where it is.
+var lastX=-1,lastY=-1;
+window.addEventListener('mousemove',function(e){lastX=e.clientX; lastY=e.clientY;},true);
+function moveFirst(e){
+  if(e.target!==Module.canvas) return;
+  if(e.type==='mousedown') Module.canvas.focus();
+  if(e.clientX!==lastX || e.clientY!==lastY) Module.canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.clientX,clientY:e.clientY,bubbles:true}));
+}
+window.addEventListener('mousedown',moveFirst,true);
+window.addEventListener('wheel',moveFirst,{capture:true,passive:true});
+window.addEventListener('load',function(){Module.canvas.focus();});
+</script>
+<!-- Emscripten's script tag, kept inert: the code above starts sweepiler.js once the page is isolated. -->
+<template>{{{ SCRIPT }}}</template>
+</body>
+</html>

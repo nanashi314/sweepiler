@@ -2,6 +2,7 @@
 #include "FrameCircuit.h"
 #include "GridLayout.h"
 #include <filesystem>
+#include <functional>
 #include <optional>
 namespace ims {
 // One tick of a FrameCircuit as an ordinary Minesweeper frame. State enters on
@@ -24,6 +25,10 @@ uint64_t frameKey(const FrameCircuit& circuit,const FrameOptions& options);
 void saveFrame(const std::filesystem::path& path,const MachineFrame& frame,const FrameOptions& options);
 std::optional<MachineFrame> loadFrame(const std::filesystem::path& path,const FrameCircuit& circuit,const FrameOptions& options);
 MachineFrame obtainFrame(const FrameCircuit& circuit,const FrameOptions& options,const std::filesystem::path& cacheDir);
+// Called by obtainFrame when the cache has no usable file, before laying the
+// frame out: it may put a prebuilt file at that path (the web build downloads
+// one) and return true. Unset in the native app.
+extern std::function<bool(const std::filesystem::path&)> fetchMissingFrame;
 // Placement: from the netlist's spatial hints, or in creation order on a near-square grid.
 std::vector<Coord> placeNorGates(const NorNetlist& net,const FrameOptions& options,Coord origin);
 std::vector<Coord> placeInOrder(size_t gates,const FrameOptions& options,Coord origin);

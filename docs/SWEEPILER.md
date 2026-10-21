@@ -12,9 +12,10 @@
 | `ui/PixelApp.*` | ドット絵UI：プログラム一覧、BUILD、RUN、SPEED、SCREEN・BOARD・CODEのタブ、STATUSとキーキャップ |
 | `ui/PixelFont.*` | 自前の5×7ドットフォント（ASCIIの大文字・小文字・数字・記号と矢印） |
 | `ui/PixelEditor.*` | ドット文字のコードエディタ：MineCのハイライト、補完、選択、クリップボード、元に戻す、自動字下げ |
-| `ui/PixelDocs.*`、`ui/MineCDocs.cpp` | MineCのリファレンス：ジャンルとトピックの木、本文。別のウィンドウに同じドット絵の見た目で描く |
-| `ui/LabCommon.*` | 共通部品：キー割り当て、ファイルの選択・読み書き、フォント、画面の保存、盤面のカメラ、従来のマインスイーパ風のマス描画 |
+| `ui/PixelDocs.*`、`ui/MineCDocs.cpp` | MineCのリファレンス：ジャンルとトピックの木、本文。別のウィンドウ（`ui/PixelDocsWin32.cpp`）に同じドット絵の見た目で描く |
+| `ui/LabCommon.*` | 共通部品：キー割り当て、ファイルの読み込み、盤面のカメラ、従来のマインスイーパ風のマス描画。ファイルの選択と保存、フォント、画面の保存はWindows版が`ui/LabWin32.cpp`、Web版が`web/LabWeb.cpp` |
 | `ui/LabMain.cpp` | ウィンドウ、D3D11、Dear ImGui、自動実行と画面保存だけ |
+| `web/` | ブラウザで動くWeb版（試作、[WEB.md](WEB.md)） |
 
 UIは`MachineSession`だけを通してコアを使います。ソルバーや配置には直接触れません。表示はすべて盤面が確定させた最新フレームから読みます。フレームのキャッシュは`%LOCALAPPDATA%\InfiniteMinesweeper\frames`です。
 
