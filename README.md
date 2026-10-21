@@ -1,55 +1,105 @@
 # sweepiler
 
-プログラムを、ふつうのマインスイーパの盤面（0〜8の数字と地雷だけ）に変換するコンパイラと、その盤面で動くゲームを遊べるドット絵のアプリです。Windows 10/11 x64向けの C++20・Win32・Direct3D 11・Dear ImGui・Z3 で書いています。
+![sweepiler](docs/images/logo.png)
 
-- 自作のC風言語MineCで書いたプログラムを、NORゲートだけの回路にコンパイルし、配置・配線して盤面にします。
-- 1ティックは1枚の盤面です。隣り合う盤面が境目の列を共有し、状態が次のティックへ渡ります。キーは入力マスの地雷、画面は出力マスの地雷として読みます。
-- 毎ティックの盤面は、個数と包含のふつうの推論だけで全マスが一つに決まります。決まらない盤面は受け入れません。
-- サンプルは19本です（入門用の6本、テトリス、ブロック崩し、スネーク、ポン、ライフゲーム、マンデルブロ集合など）。
+**MineSweeper + Compiler。** 自分で書いたプログラムを、ふつうのマインスイーパの盤面に変換して動かします。
 
-アプリの使い方と構成は[SWEEPILER.md](SWEEPILER.md)、言語は[MINEC.md](MINEC.md)にあります。
+使うのは、0〜8の数字と地雷だけです。特別な記号やルールは足していません。盤面を解くと、その答えとしてテトリスやブロック崩しが動きます。
 
-ライセンスは[MIT](LICENSE)です。同梱・取得する外部ライブラリ（Dear ImGui、Z3）のライセンスは[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)にあります。
+![盤面で動くゲーム](docs/images/games.gif)
+
+## どういうもの？
+
+マインスイーパの数字をうまく並べると、論理回路（NORゲート）が作れることが知られています。sweepilerは、それを使ってプログラムを盤面にする「コンパイラ」です。
+
+1. C風の言語MineCで、ゲームを書きます。
+2. コンパイラが、それをNORゲートだけの回路にします。
+3. 回路を配置・配線して、数字と地雷の盤面にします。
+4. キー入力を入力マスの地雷にして、盤面を解きます。解き方は、人が使う「個数」と「包含」の推論だけです。全マスが一つに決まった盤面しか受け入れません。
+5. 出力マスが地雷かどうかが、画面の画素になります。
+
+1ティックが1枚の盤面です。盤面どうしは境目の列を共有していて、そこで状態が次のティックへ渡ります。キーを押すたびに新しい盤面が後ろにつながり、順番に解かれていきます。
+
+| コードを書く | 盤面になる | ゲームが動く |
+| --- | --- | --- |
+| ![CODE](docs/images/code.png) | ![BOARD](docs/images/board.png) | ![SCREEN](docs/images/breakout.png) |
+| エディタでMineCを書き、F5で実行 | テトリスの盤面の一部（約2000万マスのうち） | 盤面を解いた答えで動くブロック崩し |
+
+サンプルは19本あります（入門用の6本、テトリス、ブロック崩し、スネーク、ポン、ライフゲーム、マンデルブロ集合など）。
+
+## MineCの例
+
+矢印キーで点を動かすプログラムです。これが54個のNORゲートの回路になり、盤面になります。
+
+```c
+#display 8 8
+input hold left;
+input hold right;
+input hold up;
+input hold down;
+
+uint3 x = 3;
+uint3 y = 3;
+
+void tick() {
+    if (left && x > 0) x--;
+    if (right && x < 7) x++;
+    if (up && y > 0) y--;
+    if (down && y < 7) y++;
+}
+
+void draw() {
+    pixel(x, y, 1);
+}
+```
+
+## システム構成
+
+![システム構成](docs/images/system.png)
+
+1. 利用者がエディタでMineCのコードを書き、`.mc`ファイルに保存
+2. コンパイラでコードをNORゲートだけの回路に変換
+3. 焼きなまし法と経路探索で回路を配置・配線し、数字と地雷の盤面を生成
+4. 生成した盤面を配置キャッシュに保存し、2回目からは読み込むだけに
+5. キー入力を入力マスの地雷にして、新しい盤面を前の盤面につなげる
+6. ソルバーで個数と包含のふつうの推論だけを使って全マスを確定
+7. 出力マスを画面の画素として、ImGuiで盤面と画面を表示
+
+部品の回路（NOR、交差、配線など）は、正しい出力でSAT、誤った出力でUNSATになることをZ3で確かめています。ゲームは、同じ言語を整数で実行する参照インタプリタと、テストで1ティックずつ照合しています（参照インタプリタは確認専用で、ゲームの進行には使いません）。
 
 ## ビルドと起動
 
-Visual Studio 2022以降の「C++によるデスクトップ開発」、Windows SDK、CMake 3.24以降、Gitが必要です。Developer PowerShellでこのREADMEのフォルダから実行します。
+Windows 10/11 x64向けです。Visual Studio 2022以降の「C++によるデスクトップ開発」、Windows SDK、CMake 3.24以降、Gitが必要です。Developer PowerShellで、このフォルダから実行します。
 
-~~~powershell
+```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release --parallel
-ctest --test-dir build -C Release --output-on-failure
 .\build\Release\sweepiler.exe
-~~~
+```
 
-Visual Studio 2026では、ジェネレーターを`Visual Studio 18 2026`にします。Dear ImGui v1.91.9bとZ3 4.13.4公式MSVC x64版を初回に取得し、Z3アーカイブのSHA-256を検査します。取得済みなら次を指定できます。
+- Visual Studio 2026では、ジェネレーターを`Visual Studio 18 2026`にします。
+- 初回の構成で、Dear ImGui v1.91.9bとZ3 4.13.4（公式のMSVC x64版、SHA-256を検査）を取得します。
+- `sweepiler.exe`は、同じフォルダにできる`libz3.dll`を使います。
+- テストは`ctest --test-dir build -C Release --output-on-failure`で実行します。
 
-~~~powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DFETCHCONTENT_SOURCE_DIR_IMGUI=C:/deps/imgui -DIMS_Z3_ROOT=C:/deps/z3-4.13.4-x64-win
-~~~
+大きなサンプル（テトリスなど）は、最初の構築で配置と配線に10〜30秒ほどかかります。結果は`%LOCALAPPDATA%\InfiniteMinesweeper\frames`に保存されるので、2回目からはすぐ始まります。
 
-`sweepiler.exe`、テスト、`libz3.dll`が`build/Release`にできます。`sweepiler.exe`は同じフォルダの`libz3.dll`を使います。
+## 遊び方
 
-## 数学的な範囲
+1. 左のPROGRAMSからサンプルを選び、BUILDを押します。
+2. PLAYで動きます。キーは矢印キーなど、画面下のSTATUSに出ているものです。
+3. SCREENタブがゲームの画面、BOARDタブが実際のマインスイーパの盤面、CODEタブがエディタです。
+4. CODEタブで書き換えて、F5で実行します。自分の`.mc`ファイルもOPENで開けます。
 
-数字nの安全マスには、周囲8マスに地雷がn個必要です。地雷自身には個数の条件がありません。ゲートの等式や参照計算の結果を、ソルバーへの条件として足すことはしません。
+## もっと詳しく
 
-通常版の符号化では、地雷の有無をBoolean変数にし、安全マスの数字を周囲の地雷数から復元します。元の規則と等価です。SATモデルは別の整数カウント検査器で確かめます。期待値の計算は検査用のコードだけで使います。
+- [docs/SWEEPILER.md](docs/SWEEPILER.md)：アプリの画面と操作、ファイル構成、テストの中身
+- [docs/MINEC.md](docs/MINEC.md)：MineC言語の書き方、サンプル、盤面の大きさと構築時間
+- [docs/MACHINES.md](docs/MACHINES.md)：もう1つの小さな言語`.imsg`と、盤面をティックごとにつなげるしくみ
+- [docs/CLASSIC_KERNELS.md](docs/CLASSIC_KERNELS.md)：NOR・交差・配線などの部品の数字と座標
 
-部品の回路は、正しい出力でSAT、誤った出力でUNSATになることをZ3で確かめます。ゲームは、同じ言語を整数で実行する参照インタプリタと、テストで照合します（参照インタプリタは検査専用で、ゲームの進行には使いません）。
+マインスイーパの盤面で論理回路が組めることは、Kaye（2000）がNP完全性の証明の中で示しました。sweepilerの小さな部品は、Thieme・Basten（2022）の構成を参考にしています。
 
-## ドキュメント
+## ライセンス
 
-- [SWEEPILER.md](SWEEPILER.md)：アプリ（画面、操作、検証）と、UIを持たない操作層MachineSession。
-- [MINEC.md](MINEC.md)：C風のMineC言語、例題、焼きなまし配置と求解の高速化。
-- [MACHINES.md](MACHINES.md)：.imsg言語、コンパイラ、参照インタプリタ、任意プログラムのフレーム連結。
-- [CLASSIC_KERNELS.md](CLASSIC_KERNELS.md)：NOR・交差・配線などの部品の数字と座標。
-
-## 構成
-
-- `src/`：コア（MineCと.imsgのコンパイラ、NORネットリスト、フレームの配置・配線、ソルバー、操作層）
-- `ui/`：ドット絵のアプリ（Win32・Direct3D 11・Dear ImGui）
-- `tests/`：部品のSAT/UNSAT検証、配置、言語、セッションのテスト
-- `examples/`：サンプルのプログラム（`.mc`、`.imsg`）
-
-通常版の小型カーネルはThieme・Bastenの構成を参考にし、接続は独自に設計しています。Kayeの拡張記号による構成を、表示だけ変えて通常版にしたものではありません。
+[MIT](LICENSE)です。外部ライブラリ（Dear ImGui、Z3）のライセンスは[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)にあります。
