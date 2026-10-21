@@ -25,6 +25,10 @@ add_compile_options(-pthread -fwasm-exceptions -sUSE_ZLIB=1 "SHELL:-include ${CM
 add_link_options(-pthread -fwasm-exceptions -sUSE_ZLIB=1)
 add_library(imgui STATIC ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+# 32-bit draw indices: WebGL has no glDrawElementsBaseVertex, so the OpenGL 3
+# backend cannot split a draw list, and the board near the zoom where cells
+# turn to plain colours passes 65536 vertices.
+target_compile_definitions(imgui PUBLIC "ImDrawIdx=unsigned int")
 target_compile_options(imgui PUBLIC -sUSE_SDL=2)
 target_link_options(imgui PUBLIC -sUSE_SDL=2)
 # core: as in the native build, but FrameSolver's Z3 fallback reports an error (IMS_NO_Z3).
