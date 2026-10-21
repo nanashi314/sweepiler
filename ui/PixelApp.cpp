@@ -7,7 +7,6 @@
 #include <cstdio>
 namespace lab {
 namespace {
-constexpr float virtualW=400,virtualH=250;
 // PICO-8 palette.
 constexpr ImU32 rgb(unsigned v,unsigned a=255) {return IM_COL32((v>>16)&255,(v>>8)&255,v&255,a);}
 constexpr ImU32 black=rgb(0x000000),navy=rgb(0x1D2B53),plum=rgb(0x7E2553),forest=rgb(0x008751),brown=rgb(0xAB5236),
@@ -120,8 +119,9 @@ void PixelApp::frame(float width,float height) {
     feedKeys(session_,s,capHeld_,!(editor_.focused() && tab_==2));
     time_=ImGui::GetTime();
     // Whole-number scale of the virtual screen, centred.
-    scale_=std::max(1.0f,std::floor(std::min(width/virtualW,height/virtualH)));
-    origin_={std::floor((width-virtualW*scale_)/2),std::floor((height-virtualH*scale_)/2)};
+    const ImVec2 v=virtualSize();
+    scale_=std::max(1.0f,std::floor(std::min(width/v.x,height/v.y)));
+    origin_={std::floor((width-v.x*scale_)/2),std::floor((height-v.y*scale_)/2)};
     if(fixedScale_>0) {scale_=fixedScale_; origin_=fixedOrigin_;}
     ImGui::SetNextWindowPos({0,0}); ImGui::SetNextWindowSize({width,height});
     ImGui::Begin("##pixel",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoBringToFrontOnFocus|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_NoScrollWithMouse);
@@ -130,7 +130,7 @@ void PixelApp::frame(float width,float height) {
     menu(s);
     // Tabs over the main view.
     // The code editor takes the status panel's room too.
-    const float mx=140,my=16,mw=256,mh=tab_==2?230.0f:172.0f;
+    const float mx=portrait_?4.0f:140.0f,my=16,mw=256,mh=tab_==2?230.0f:172.0f;
     auto tab=[&](const char* id,float x,float w,const char* label,int index){
         ImGui::SetCursorScreenPos(at(x,4));
         if(ImGui::InvisibleButton(id,{w*scale_,13*scale_})) tab_=index;
@@ -147,15 +147,16 @@ void PixelApp::frame(float width,float height) {
     if(tab_==0) screen(s,mx+6,my+6,mw-12,mh-12); else if(tab_==1) board(mx+4,my+4,mw-8,mh-8); else code(mx+4,my+4,mw-8,mh-8);
     if(tab_!=2) status(s);
     // Faint scanlines over everything.
-    for(float y=0;y<virtualH;y+=2) rect(0,y+1,virtualW,0.5f,rgb(0x000000,40));
+    for(float y=0;y<v.y;y+=2) rect(0,y+1,v.x,0.5f,rgb(0x000000,40));
     ImGui::End();
 }
 void PixelApp::menu(const ims::MachineSession::Status& s) {
-    const float x=4,y=4,w=132,h=242;
+    // Upright, the list goes under the status panel, as wide as the screen and five rows shorter.
+    const float x=4,y=portrait_?250.0f:4.0f,w=portrait_?256.0f:132.0f,h=portrait_?187.0f:242.0f;
     panel(x,y,w,h,"PROGRAMS");
     // Program list with a blinking cursor.
-    // The list shows 13 rows; the wheel scrolls it, and the chosen program stays in view.
-    constexpr int rows=13; const float listTop=y+12;
+    // The list shows 13 rows (8 upright); the wheel scrolls it, and the chosen program stays in view.
+    const int rows=portrait_?8:13; const float listTop=y+12;
     const int count=static_cast<int>(programs_.size())+1;
     if(choice_!=listFollowed_) {
         int c=static_cast<int>(choice_);
@@ -278,7 +279,7 @@ void PixelApp::board(float x,float y,float w,float h) {
     if(!session_.status().ready) textCentered(x+w/2,y+h/2,"NO BOARD YET",ash);
 }
 void PixelApp::status(const ims::MachineSession::Status& s) {
-    const float x=140,y=192,w=256,h=54;
+    const float x=portrait_?4.0f:140.0f,y=192,w=256,h=54;
     panel(x,y,w,h,"STATUS");
     if(!s.ready) {text(x+8,y+12,s.building?"PLEASE WAIT":"READY",silver); return;}
     std::string name=upper(s.name); if(name.size()>16) name=name.substr(0,16);

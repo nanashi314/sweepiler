@@ -29,6 +29,10 @@ public:
     void showSamples() {tab_=2; samples_=true;}
     // For recording: a fixed scale and origin of the virtual screen, the board camera and the editor.
     void setFixedLayout(float scale,ImVec2 origin) {fixedScale_=scale; fixedOrigin_=origin;}
+    // Upright phones: the screen, the status and the program list in one column.
+    void setPortrait(bool on) {portrait_=on;}
+    // The virtual screen in chunky pixels: 400 x 250, or 264 x 441 in one column.
+    ImVec2 virtualSize() const {return portrait_?ImVec2{264,441}:ImVec2{400,250};}
     BoardCamera& camera() {return camera_;}
     PixelEditor& editor() {return editor_;}
     int tab() const {return tab_;}
@@ -73,6 +77,7 @@ private:
     bool samples_{};                 // the sample picker is open
     int listScroll_{};               // first row shown in the program list
     int pickScroll_{};
+    bool portrait_{};
     float fixedScale_{};
     ImVec2 fixedOrigin_{};               // first row of cards shown in the sample picker
     size_t listFollowed_{static_cast<size_t>(-1)};
