@@ -1,0 +1,56 @@
+# Pong: keep the ball in play with the paddle on the left (UP / DOWN).
+display 8 6
+input UP hold
+input DOWN hold
+state paddle 3 = 2
+state bx 3 = 4
+state by 3 = 2
+state dx 1
+state dy 1 = 1
+state slow 1
+state lost 2
+tick
+  if UP and paddle > 0
+    paddle = paddle - 1
+  elif DOWN and paddle < 4
+    paddle = paddle + 1
+  end
+  slow = not slow
+  if lost > 0
+    lost = lost - 1
+    bx = 4
+    by = 2
+  elif slow
+    if by == 0
+      dy = 1
+    elif by == 5
+      dy = 0
+    end
+    if bx == 7
+      dx = 0
+    elif bx == 1 and (by == paddle or by == paddle + 1)
+      dx = 1
+    end
+    if bx == 0
+      lost = 3
+    else
+      if dx
+        bx = bx + 1
+      else
+        bx = bx - 1
+      end
+      if dy
+        by = by + 1
+      else
+        by = by - 1
+      end
+    end
+  end
+end
+screen
+  for j 0 5
+    for i 0 7
+      pixel i j = (i == bx and j == by) or (i == 0 and (j == paddle or j == paddle + 1)) or (lost > 0 and j == 0)
+    end
+  end
+end

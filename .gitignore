@@ -1,0 +1,10 @@
+/build/
+/out/
+/.vs/
+imgui.ini
+/bin/
+/work/
+*.zip
+*.log
+/TEST_RESULTS.txt
+/examples/*.ims

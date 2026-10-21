@@ -1,0 +1,46 @@
+# Paint: arrows move the cursor, A toggles the pixel under it.
+# "at" keeps each pixel's logic together, which keeps the board small.
+display 6 6
+input LEFT press
+input RIGHT press
+input UP press
+input DOWN press
+input A press
+state x 3 = 2
+state y 3 = 2
+state canvas 36
+state blink 1
+tick
+  for j 0 5
+    for i 0 5
+      at i j
+      if A and x == i and y == j
+        canvas[(j << 2) + (j << 1) + i] = not canvas[(j << 2) + (j << 1) + i]
+      end
+    end
+  end
+  at 7 0
+  if LEFT and x > 0
+    x = x - 1
+  end
+  if RIGHT and x < 5
+    x = x + 1
+  end
+  at 7 2
+  if UP and y > 0
+    y = y - 1
+  end
+  if DOWN and y < 5
+    y = y + 1
+  end
+  blink = not blink
+end
+screen
+  for j 0 5
+    for i 0 5
+      at i j
+      let here 1 = x == i and y == j
+      pixel i j = canvas[(j << 2) + (j << 1) + i] ^ (blink and here)
+    end
+  end
+end
