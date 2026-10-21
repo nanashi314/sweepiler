@@ -5,7 +5,6 @@
 #include "PixelApp.h"
 #include "PixelDocs.h"
 #include "MachineFrame.h"
-#include "PixelFont.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
 #include <SDL.h>
@@ -13,7 +12,6 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -70,109 +68,26 @@ bool fetchPrebuilt(const std::filesystem::path& path) {
     return ok;
 }
 // Phones. Where a whole-number scale would leave the lab's 400 x 250 screen at
-// 1x, it takes a fractional scale instead, and the program's keys get big
-// buttons in the room left over. Upright, the lab stacks the screen, the
-// status and the program list in one column (264 x 441) as wide as the phone,
-// with the buttons below; turned, the buttons sit at its sides. A button sends
-// its key's first binding as a key event, so the lab reads it like the keyboard.
-struct PhoneLayout {bool portrait{}; float scale{}; ImVec2 origin{}; ImVec4 pads[2]{}; int padCount{};};   // pads: x, y, width, height
+// 1x, it takes a fractional scale instead. Upright, the lab stacks the screen,
+// the status and the program list in one column (264 x 441) as wide as the
+// phone. The status panel's key caps play the program.
+struct PhoneLayout {bool portrait{}; float scale{}; ImVec2 origin{};};
 PhoneLayout phoneLayout(float w,float h) {
     PhoneLayout l; const float fit=std::min(w/400,h/250);
     if(fit>=2) return l;
-    if(h>w) {
-        // At least a fifth of the height stays for the buttons.
-        l.portrait=true; l.scale=std::min(w/264,h*0.8f/441);
-        const float screenW=264*l.scale,screenH=441*l.scale;
-        l.origin={std::floor((w-screenW)/2),0};
-        l.pads[0]={0,screenH,w,h-screenH}; l.padCount=1;
-    } else {
-        l.scale=fit;
-        const float side=std::floor((w-400*fit)/2);
-        l.origin={side,std::floor((h-250*fit)/2)};
-        if(side>=70) {l.pads[0]={0,0,side,h}; l.pads[1]={w-side,0,side,h}; l.padCount=2;}
-    }
+    const ImVec2 v=h>w?ImVec2{264,441}:ImVec2{400,250};
+    l.portrait=h>w; l.scale=std::min(w/v.x,h/v.y);
+    l.origin={std::floor((w-v.x*l.scale)/2),std::floor((h-v.y*l.scale)/2)};
     return l;
 }
-std::vector<uint8_t> padHeld;   // per key, held on a pad button
-void keyPads(const PhoneLayout& l,const ims::MachineSession::Status& s,bool shown) {
-    auto& io=ImGui::GetIO();
-    const auto binds=lab::bindingsFor(s.keys);
-    std::vector<uint8_t> held(s.keys.size(),0);
-    if(shown && l.padCount && s.ready) {
-        // Arrows in a cross (LEFT, RIGHT, UP or ROTATE, DOWN), the other keys in a column.
-        int cross[4]={-1,-1,-1,-1}; std::vector<size_t> others;
-        for(size_t i=0;i<s.keys.size();++i) {
-            std::string k=s.keys[i]; for(auto& c:k) c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-            int slot=k=="LEFT"?0:k=="RIGHT"?1:(k=="UP" || k=="ROTATE")?2:k=="DOWN"?3:-1;
-            if(slot>=0 && cross[slot]<0) cross[slot]=static_cast<int>(i); else others.push_back(i);
-        }
-        const bool hasCross=cross[0]>=0 || cross[1]>=0 || cross[2]>=0 || cross[3]>=0;
-        const ImVec4 a=l.pads[0],b=l.padCount>1?l.pads[1]:l.pads[0];
-        // Upright, one pad holds both: the cross on the left, the column on the right.
-        ImVec4 crossBox=l.padCount>1?a:ImVec4{a.x,a.y,a.z*0.55f,a.w},columnBox=l.padCount>1?b:ImVec4{a.x+a.z*0.55f,a.y,a.z*0.45f,a.w};
-        if(!hasCross && l.padCount==1) columnBox=a;
-        if(others.empty() && l.padCount==1) crossBox=a;
-        const float size=std::floor(std::min(crossBox.z/3.3f,crossBox.w/3.3f));
-        int window=0;
-        auto button=[&](size_t key,ImVec2 c,float e,std::string label){
-            ImGui::SetCursorScreenPos({c.x-e/2,c.y-e/2});
-            ImGui::InvisibleButton(("##pad"+std::to_string(key)).c_str(),{e,e});
-            const bool down=ImGui::IsItemActive(); held[key]=down;
-            auto* d=ImGui::GetWindowDrawList(); const float u=std::max(1.0f,std::floor(e/24)),x=c.x-e/2,y=c.y-e/2,o=down?u:0;
-            if(!down) d->AddRectFilled({x+u,y+u},{x+e+u,y+e+u},IM_COL32(0,0,0,255));
-            d->AddRectFilled({x+o,y+o},{x+o+e,y+o+e},IM_COL32(0,0,0,255));
-            d->AddRectFilled({x+o+u,y+o+u},{x+o+e-u,y+o+e-u},down?IM_COL32(255,236,39,255):IM_COL32(194,195,199,255));
-            d->AddRectFilled({x+o+u,y+o+u},{x+o+e-u,y+o+2*u},IM_COL32(255,255,255,255));
-            float fs=std::max(1.0f,std::floor(e*0.5f/7));
-            while(fs>1 && static_cast<float>(lab::pixelfont::width(label))*fs>e*0.8f) --fs;
-            lab::pixelfont::draw(d,{x+o+std::floor((e-static_cast<float>(lab::pixelfont::width(label))*fs)/2),y+o+std::floor((e-7*fs)/2)},fs,IM_COL32(0,0,0,255),label);
-        };
-        auto begin=[&](ImVec4 r){
-            ImGui::SetNextWindowPos({r.x,r.y}); ImGui::SetNextWindowSize({r.z,r.w});
-            ImGui::Begin(("##pads"+std::to_string(window++)).c_str(),nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_NoNav);
-        };
-        auto upper=[](std::string t){for(auto& c:t) c=static_cast<char>(std::toupper(static_cast<unsigned char>(c))); return t.substr(0,5);};
-        auto glyphFor=[&](int k){return upper(s.keys[static_cast<size_t>(cross[k])])=="ROTAT"?std::string("ROT"):std::string(k==0?"":k==1?"":k==2?"":"");};
-        if(l.padCount>1) {
-            // Turned: like a game pad, LEFT and RIGHT under the left thumb, the rest under the right.
-            const float e=std::floor(std::min(a.z/2.3f,a.w/3.3f));
-            std::vector<size_t> right; for(int k:{2,3}) if(cross[k]>=0) right.push_back(static_cast<size_t>(cross[k]));
-            right.insert(right.end(),others.begin(),others.end());
-            if(cross[0]>=0 || cross[1]>=0) {
-                begin(a);
-                for(int k:{0,1}) if(cross[k]>=0) button(static_cast<size_t>(cross[k]),{a.x+a.z/2+(k?0.55f:-0.55f)*e,a.y+a.w/2},e,glyphFor(k));
-                ImGui::End();
-            }
-            if(!right.empty()) {
-                begin(b);
-                const float f=std::floor(std::min(e,b.w/(static_cast<float>(right.size())*1.15f)));
-                float y=b.y+b.w/2-(static_cast<float>(right.size())-1)*f*0.575f;
-                for(size_t k:right) {
-                    int slot=-1; for(int c=0;c<4;++c) if(cross[c]==static_cast<int>(k)) slot=c;
-                    button(k,{b.x+b.z/2,y},f,slot>=0?glyphFor(slot):upper(s.keys[k])); y+=f*1.15f;
-                }
-                ImGui::End();
-            }
-        } else {
-        if(hasCross) {
-            begin(crossBox);
-            const ImVec2 c{crossBox.x+crossBox.z/2,crossBox.y+crossBox.w/2};
-            const ImVec2 at[4]={{c.x-size,c.y},{c.x+size,c.y},{c.x,c.y-size},{c.x,c.y+size}};
-            for(int k=0;k<4;++k) if(cross[k]>=0) button(static_cast<size_t>(cross[k]),at[k],size-4,glyphFor(k));
-            ImGui::End();
-        }
-        if(!others.empty()) {
-            begin(columnBox);
-            const float e=std::floor(std::min({size-4,columnBox.z*0.7f,columnBox.w/(static_cast<float>(others.size())*1.2f)}));
-            float y=columnBox.y+columnBox.w/2-(static_cast<float>(others.size())-1)*e*0.6f;
-            for(size_t k:others) {button(k,{columnBox.x+columnBox.z/2,y},e,upper(s.keys[k])); y+=e*1.2f;}
-            ImGui::End();
-        }
-        }
-    }
-    // Key events only on changes; a hidden pad lets go of its keys.
-    padHeld.resize(s.keys.size(),0);
-    for(size_t i=0;i<s.keys.size() && i<binds.size();++i) if(held[i]!=padHeld[i] && !binds[i].empty()) {io.AddKeyEvent(binds[i][0],held[i]!=0); padHeld[i]=held[i];}
+// The page's file inputs (shell.html) lie over the OPEN buttons, so a tap opens
+// the browser's picker directly, as phones only allow from the tap itself.
+EM_JS(void,placeFileInputs,(const float* r,int n),{if(Module.placeFileInputs) Module.placeFileInputs(Array.from(HEAPF32.subarray(r>>2,(r>>2)+n*4)));});
+std::vector<float> fileInputs;
+void syncFileInputs() {
+    std::vector<float> r;
+    if(!docs->isOpen()) for(const auto& a:app->areas().open) r.insert(r.end(),{a.x,a.y,a.z,a.w});
+    if(r!=fileInputs) {fileInputs=r; placeFileInputs(r.data(),static_cast<int>(r.size()/4));}
 }
 void frame() {
     SDL_Event e; while(SDL_PollEvent(&e)) ImGui_ImplSDL2_ProcessEvent(&e);
@@ -188,7 +103,7 @@ void frame() {
     app->setPortrait(phone.portrait);
     app->setFixedLayout(phone.scale,phone.origin);   // scale 0: the lab's own whole-number fit
     if(docs->isOpen()) docs->render(); else app->frame(io.DisplaySize.x,io.DisplaySize.y);
-    keyPads(phone,s,!docs->isOpen() && app->tab()!=2);
+    syncFileInputs();
     ImGui::Render();
     glViewport(0,0,static_cast<int>(io.DisplaySize.x*io.DisplayFramebufferScale.x),static_cast<int>(io.DisplaySize.y*io.DisplayFramebufferScale.y));
     glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT);
@@ -204,6 +119,21 @@ void frame() {
 }
 // Called by the page when the file picker (OPEN) has written a file.
 extern "C" EMSCRIPTEN_KEEPALIVE void web_opened(const char* path) {opened=path;}
+// Touch (shell.html asks where a finger went down): 1 on the board, where a
+// drag pans and two fingers zoom; 2 in the code editor, where a tap also brings
+// up the phone's keyboard; 0 elsewhere, where a swipe scrolls.
+extern "C" EMSCRIPTEN_KEEPALIVE int web_touch_mode(float x,float y) {
+    if(!app || docs->isOpen()) return 0;
+    auto in=[&](ImVec4 r){return r.z>r.x && x>=r.x && x<r.z && y>=r.y && y<r.w;};
+    const auto& a=app->areas();
+    return app->tab()==1 && in(a.board)?1:app->tab()==2 && in(a.editor)?2:0;
+}
+// Text and keys from the phone's keyboard (a hidden textarea in shell.html).
+extern "C" EMSCRIPTEN_KEEPALIVE void web_type(const char* text) {ImGui::GetIO().AddInputCharactersUTF8(text);}
+extern "C" EMSCRIPTEN_KEEPALIVE void web_key(int key) {
+    const ImGuiKey k=key==1?ImGuiKey_Backspace:ImGuiKey_Enter;
+    ImGui::GetIO().AddKeyEvent(k,true); ImGui::GetIO().AddKeyEvent(k,false);
+}
 // The session's state as text, for checking the page from the console.
 extern "C" EMSCRIPTEN_KEEPALIVE const char* web_status() {return status.c_str();}
 int main() {

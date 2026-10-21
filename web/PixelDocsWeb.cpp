@@ -3,6 +3,7 @@
 #include "PixelDocs.h"
 #include "PixelFont.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include <algorithm>
 namespace lab {
 PixelDocs::~PixelDocs()=default;
@@ -18,11 +19,14 @@ void PixelDocs::render() {
     openSample=[&](const std::string& name){opened=true; if(user) user(name);};
     ui(width,height);
     openSample=user;
-    // BACK at the right of the tree's title, sized like the reference's own buttons.
+    // BACK at the right of the tree's title, sized like the reference's own
+    // buttons; where the tree is too narrow for both (phones), at its foot.
     const float v=width>=1500 && height>=900?3.0f:2.0f,pad=6*v,treeW=std::min(150*v,width*0.32f);
-    const float x=pad+treeW-38*v,y=pad+4*v,w=30*v,h=11*v;
+    const float w=30*v,h=11*v,x=treeW>=110*v?pad+treeW-38*v:pad+(treeW-w)/2,y=treeW>=110*v?pad+4*v:height-pad-h-6*v;
     ImGui::SetNextWindowPos({x,y}); ImGui::SetNextWindowSize({w+v,h+v});
     ImGui::Begin("##docsback",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoBackground);
+    // A click in the reference brings its window to the front; BACK stays above it.
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
     auto* d=ImGui::GetWindowDrawList();
     bool back=ImGui::InvisibleButton("##back",{w,h}),hov=ImGui::IsItemHovered(),down=ImGui::IsItemActive();
     const float o=down?v:0;

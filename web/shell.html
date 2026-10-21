@@ -9,6 +9,8 @@
 html,body{margin:0;height:100%;overflow:hidden;background:#10162B}
 canvas{display:block;width:100vw;height:100vh;outline:none;touch-action:none}
 #status{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#C2C3C7;font:16px monospace;white-space:pre;text-align:center}
+input.open{position:fixed;display:none;margin:0;padding:0;opacity:0;cursor:pointer}
+#keys{position:fixed;left:0;top:0;width:1px;height:1px;margin:0;padding:0;border:0;opacity:0;resize:none;font-size:16px}
 </style>
 </head>
 <body>
@@ -32,12 +34,131 @@ var lastX=-1,lastY=-1;
 window.addEventListener('mousemove',function(e){lastX=e.clientX; lastY=e.clientY;},true);
 function moveFirst(e){
   if(e.target!==Module.canvas) return;
-  if(e.type==='mousedown') Module.canvas.focus();
+  if(e.type==='mousedown' && e.isTrusted) Module.canvas.focus();
   if(e.clientX!==lastX || e.clientY!==lastY) Module.canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.clientX,clientY:e.clientY,bubbles:true}));
 }
 window.addEventListener('mousedown',moveFirst,true);
 window.addEventListener('wheel',moveFirst,{capture:true,passive:true});
 window.addEventListener('load',function(){Module.canvas.focus();});
+// A chosen program file goes to the file system, then to the editor (web_opened).
+Module.receiveProgramFile=function(f){
+  if(!f) return;
+  f.arrayBuffer().then(function(buffer){
+    try{FS.mkdir('/uploads');}catch(e){}
+    var path='/uploads/'+f.name.split('/').join('_').split(String.fromCharCode(92)).join('_');
+    FS.writeFile(path,new Uint8Array(buffer));
+    Module.ccall('web_opened',null,['string'],[path]);
+  });
+};
+// File inputs over the OPEN buttons (WebMain places them when the buttons
+// move): a tap opens the browser's picker, which phones allow only from the
+// tap itself, not from the frame drawn after it.
+var fileInputs=[];
+Module.placeFileInputs=function(r){
+  while(fileInputs.length<r.length/4){
+    var input=document.createElement('input'); input.type='file'; input.accept='.mc,.imsg,.txt'; input.className='open';
+    input.onchange=function(){Module.receiveProgramFile(this.files[0]); this.value='';};
+    document.body.appendChild(input); fileInputs.push(input);
+  }
+  fileInputs.forEach(function(input,i){
+    var s=input.style;
+    if(i*4>=r.length) {s.display='none'; return;}
+    s.display='block'; s.left=r[i*4]+'px'; s.top=r[i*4+1]+'px'; s.width=(r[i*4+2]-r[i*4])+'px'; s.height=(r[i*4+3]-r[i*4+1])+'px';
+  });
+};
+// The phone's keyboard for the code editor: a hidden textarea that a tap in
+// the editor focuses. What is typed into it reaches the editor as characters,
+// Backspace and Enter; it starts with two invisible characters, so Backspace
+// in an empty field still changes something.
+var keys=document.createElement('textarea'),sentinel='​​',typed=sentinel,composing=false;
+keys.id='keys'; keys.spellcheck=false;
+['autocapitalize','autocomplete','autocorrect'].forEach(function(a){keys.setAttribute(a,'off');});
+document.body.appendChild(keys);
+function resetKeys(){keys.value=sentinel; typed=sentinel; keys.setSelectionRange(sentinel.length,sentinel.length);}
+keys.addEventListener('input',function(){
+  var v=keys.value,p=0;
+  while(p<v.length && p<typed.length && v[p]===typed[p]) ++p;
+  for(var i=p;i<typed.length;++i) Module.ccall('web_key',null,['number'],[1]);
+  for(var ch of v.slice(p)) {
+    if(ch==='\n') Module.ccall('web_key',null,['number'],[2]);
+    else if(ch!=='​') Module.ccall('web_type',null,['string'],[ch]);
+  }
+  typed=v;
+  if(!composing && (v.length<sentinel.length || v.length>64 || v.indexOf('\n')>=0)) resetKeys();
+});
+keys.addEventListener('compositionstart',function(){composing=true;});
+keys.addEventListener('compositionend',function(){composing=false; resetKeys();});
+// Touch. SDL would make a finger the mouse as it is. Instead, on the board one
+// finger drags it (as the mouse pans) and two fingers zoom it; elsewhere a tap
+// clicks, a held finger holds (the key caps) and a swipe scrolls in whole wheel
+// steps, one per 32 pixels, as the lists scroll by whole steps.
+var canvas=Module.canvas,touch=null;
+function send(type,x,y){canvas.dispatchEvent(new MouseEvent(type,{clientX:x,clientY:y,button:0,bubbles:true}));}
+function wheel(x,y,dy){canvas.dispatchEvent(new WheelEvent('wheel',{clientX:x,clientY:y,deltaY:dy,deltaMode:0,bubbles:true}));}
+function touchMode(x,y){try{return Module.ccall('web_touch_mode','number',['number','number'],[x,y]);}catch(e){return 0;}}
+function spread(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+function press(f){if(!f.pending) return; f.pending=false; f.down=true; send('mousemove',f.x,f.y); send('mousedown',f.x,f.y);}
+function onTouch(e){
+  if(e.target!==canvas) return;
+  e.preventDefault(); e.stopPropagation();
+  var t=e.touches;
+  if(e.type==='touchstart'){
+    if(t.length===1){
+      var c=t[0],started;
+      started=touch={id:c.identifier,x0:c.clientX,y0:c.clientY,x:c.clientX,y:c.clientY,lastY:c.clientY,mode:touchMode(c.clientX,c.clientY),scrolling:false,acc:0,down:false,pending:true,pinch:0};
+      // The pointer goes there first and presses a frame later: in one frame
+      // the jump would count as a drag of the board.
+      send('mousemove',c.clientX,c.clientY);
+      requestAnimationFrame(function(){if(touch===started) press(started);});
+    } else if(t.length===2 && touch && touch.mode===1){
+      // A second finger on the board: let go and zoom around the fingers' middle.
+      touch.pending=false;
+      if(touch.down){send('mouseup',touch.x,touch.y); touch.down=false;}
+      touch.pinch=spread(t);
+    }
+    return;
+  }
+  if(!touch) return;
+  if(e.type==='touchmove'){
+    if(touch.pinch){
+      if(t.length<2) return;
+      var d=spread(t),mx=(t[0].clientX+t[1].clientX)/2,my=(t[0].clientY+t[1].clientY)/2;
+      send('mousemove',mx,my); wheel(mx,my,-Math.log(d/touch.pinch)/Math.log(1.2)*100); touch.pinch=d;
+      return;
+    }
+    var m=null; for(var i=0;i<t.length;++i) if(t[i].identifier===touch.id) m=t[i];
+    if(!m) return;
+    touch.x=m.clientX; touch.y=m.clientY;
+    if(touch.mode===1){send('mousemove',m.clientX,m.clientY); return;}
+    if(!touch.scrolling && Math.hypot(m.clientX-touch.x0,m.clientY-touch.y0)>10){
+      // A swipe, not a tap: let go in the canvas's top-left corner, which no
+      // layout uses (SDL drops a release outside the canvas), so nothing is
+      // clicked; then scroll where it started.
+      touch.scrolling=true; touch.pending=false;
+      if(touch.down){touch.down=false; send('mousemove',0,0); send('mouseup',0,0);}
+      send('mousemove',touch.x0,touch.y0);
+    }
+    if(touch.scrolling){
+      touch.acc+=touch.lastY-m.clientY; touch.lastY=m.clientY;
+      var steps=Math.trunc(touch.acc/32);
+      if(steps){wheel(touch.x0,touch.y0,steps*100); touch.acc-=steps*32;}
+    }
+    return;
+  }
+  if(t.length>0) return;   // touchend or touchcancel: wait for the last finger
+  if(touch.pending && e.type==='touchend') press(touch);   // a quick tap: press, then let go
+  if(touch.down){
+    if(e.type==='touchcancel') {send('mousemove',0,0); send('mouseup',0,0);}
+    else send('mouseup',touch.x,touch.y);
+  }
+  if(!touch.scrolling && !touch.pinch){
+    // A tap in the editor brings up the keyboard (allowed only here, in the tap itself); elsewhere it goes away.
+    if(touch.mode===2){keys.style.left=touch.x+'px'; keys.style.top=touch.y+'px'; resetKeys(); keys.focus({preventScroll:true});}
+    else keys.blur();
+  }
+  touch=null;
+}
+['touchstart','touchmove','touchend','touchcancel'].forEach(function(n){window.addEventListener(n,onTouch,{capture:true,passive:false});});
 </script>
 <!-- Emscripten's script tag, kept inert: the code above starts sweepiler.js once the page is isolated. -->
 <template>{{{ SCRIPT }}}</template>

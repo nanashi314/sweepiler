@@ -42,7 +42,7 @@ target_include_directories(sweepiler PRIVATE ${ROOT}/ui)
 target_link_libraries(sweepiler PRIVATE core imgui)
 set_target_properties(sweepiler PROPERTIES SUFFIX .html LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shell.html")
 target_link_options(sweepiler PRIVATE ${IMS_WEB_MEMORY} -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sPTHREAD_POOL_SIZE=3
-  -sEXPORTED_FUNCTIONS=_main,_web_opened,_web_status -sEXPORTED_RUNTIME_METHODS=ccall,FS -lidbfs.js
+  -sEXPORTED_FUNCTIONS=_main,_web_opened,_web_status,_web_touch_mode,_web_type,_web_key -sEXPORTED_RUNTIME_METHODS=ccall,FS -lidbfs.js
   "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/shell.html" "SHELL:--preload-file ${IMS_WEB_FONT}@/fonts/BIZUDGothic-Regular.ttf")
 add_custom_command(TARGET sweepiler POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/coi-serviceworker.js ${CMAKE_BINARY_DIR}/fonts/OFL.txt ${CMAKE_BINARY_DIR}

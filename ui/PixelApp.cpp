@@ -119,6 +119,7 @@ void PixelApp::frame(float width,float height) {
     feedKeys(session_,s,capHeld_,!(editor_.focused() && tab_==2));
     time_=ImGui::GetTime();
     // Whole-number scale of the virtual screen, centred.
+    areas_={};
     const ImVec2 v=virtualSize();
     scale_=std::max(1.0f,std::floor(std::min(width/v.x,height/v.y)));
     origin_={std::floor((width-v.x*scale_)/2),std::floor((height-v.y*scale_)/2)};
@@ -186,7 +187,9 @@ void PixelApp::menu(const ims::MachineSession::Status& s) {
         return clicked;
     };
     for(size_t i=0;i<programs_.size();++i) if(item(("##p"+std::to_string(i)).c_str(),programs_[i].label,!file_ && i==choice_)) choose(i);
+    const float fileY=ly; const bool fileShown=row>=listScroll_ && row<listScroll_+rows && !s.building;
     if(item("##file",file_?file_->filename().string():"OPEN FILE...",file_.has_value())) {if(auto f=openProgramDialog()) file_=f;}
+    if(fileShown) {ImVec2 a=at(x+4,fileY),b=at(x+w-10,fileY+10); areas_.open.push_back({a.x,a.y,b.x,b.y});}
     // More above or below.
     if(listScroll_>0) text(x+w-10,listTop+1,"\x02",orange);
     if(listScroll_+rows<count) text(x+w-10,listTop+(rows-1)*11+2,"\x03",orange);
@@ -265,6 +268,7 @@ void PixelApp::board(float x,float y,float w,float h) {
     if(button("##fit",x+w-30,y+2,28,11,"FIT",silver,black)) camera_.fit();
     float top=y+16;
     ImVec2 p0=at(x,top),size{w*scale_,(h-16)*scale_};
+    areas_.board={p0.x,p0.y,p0.x+size.x,p0.y+size.y};
     ImGui::SetCursorScreenPos(p0);
     ImGui::InvisibleButton("##map",size);
     const bool hovered=ImGui::IsItemHovered(),active=ImGui::IsItemActive();
@@ -318,7 +322,9 @@ void PixelApp::code(float x,float y,float w,float h) {
     auto next=[&](float width){float at_=bx; bx+=width+2; return at_;};
     if(button("##new",next(26),y+1,26,12,"NEW",silver,black)) newCode(newProgram);
     if(button("##samples",next(46),y+1,46,12,"SAMPLES",samples_?yellow:orange,black)) samples_=!samples_;
-    if(button("##open",next(30),y+1,30,12,"OPEN",silver,black)) {if(auto f=openProgramDialog()) openCodeFile(*f);}
+    const float openX=next(30);
+    if(button("##open",openX,y+1,30,12,"OPEN",silver,black)) {if(auto f=openProgramDialog()) openCodeFile(*f);}
+    {ImVec2 a=at(openX,y+1),b=at(openX+30,y+13); areas_.open.push_back({a.x,a.y,b.x,b.y});}
     if(button("##save",next(30),y+1,30,12,"SAVE",silver,black)) {
         auto target=codePath_?codePath_:saveProgramDialog(codeName_+(codeLanguage_==ims::ProgramLanguage::Imsg?".imsg":".mc"));
         if(target) {
@@ -333,7 +339,10 @@ void PixelApp::code(float x,float y,float w,float h) {
     const float top=y+16,bottom=y+h-11;
     const float fontScale=std::max(1.0f,scale_-1);
     if(samples_) samplePicker(x,top,w,bottom-top);
-    else if(editor_.draw("##editor",at(x,top),{w*scale_,(bottom-top)*scale_},fontScale,pico8Code(),errorLine_)) {dirty_=true; errorLine_=0;}
+    else {
+        ImVec2 a=at(x,top),b=at(x+w,bottom); areas_.editor={a.x,a.y,b.x,b.y};
+        if(editor_.draw("##editor",a,{w*scale_,(bottom-top)*scale_},fontScale,pico8Code(),errorLine_)) {dirty_=true; errorLine_=0;}
+    }
     // Bottom line: the compile error, or the program's name and the keys.
     if(!error_.empty()) {std::string e=upper(error_); if(e.size()>40) e=e.substr(0,39)+"."; text(x+3,y+h-8,e,red);}
     else {

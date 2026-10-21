@@ -33,6 +33,11 @@ public:
     void setPortrait(bool on) {portrait_=on;}
     // The virtual screen in chunky pixels: 400 x 250, or 264 x 441 in one column.
     ImVec2 virtualSize() const {return portrait_?ImVec2{264,441}:ImVec2{400,250};}
+    // Where the last frame drew the board, the code editor and the OPEN
+    // buttons, in screen pixels (x0, y0, x1, y1; zero when not shown), for a
+    // page that handles touch and file choosing itself.
+    struct Areas {ImVec4 board{},editor{}; std::vector<ImVec4> open;};
+    const Areas& areas() const {return areas_;}
     BoardCamera& camera() {return camera_;}
     PixelEditor& editor() {return editor_;}
     int tab() const {return tab_;}
@@ -78,6 +83,7 @@ private:
     int listScroll_{};               // first row shown in the program list
     int pickScroll_{};
     bool portrait_{};
+    Areas areas_;
     float fixedScale_{};
     ImVec2 fixedOrigin_{};               // first row of cards shown in the sample picker
     size_t listFollowed_{static_cast<size_t>(-1)};

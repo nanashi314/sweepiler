@@ -1,19 +1,14 @@
 // The browser side of LabCommon. OPEN picks a file with the browser's picker,
-// which delivers it later (web_opened in WebMain.cpp); saving downloads the file.
+// which delivers it later (shell.html, then web_opened in WebMain.cpp); the
+// page's own file inputs over the OPEN buttons usually take the click first.
+// Saving downloads the file.
 #include "LabCommon.h"
 #include <emscripten.h>
 #include <fstream>
 namespace lab {
 EM_JS(void,pickProgramFile,(),{
     var input=document.createElement('input'); input.type='file'; input.accept='.mc,.imsg,.txt';
-    input.onchange=function(){
-        var f=input.files[0]; if(!f) return;
-        f.arrayBuffer().then(function(buffer){
-            try{FS.mkdir('/uploads');}catch(e){}
-            var path='/uploads/'+f.name.split('/').join('_').split(String.fromCharCode(92)).join('_'); FS.writeFile(path,new Uint8Array(buffer));
-            Module.ccall('web_opened',null,['string'],[path]);
-        });
-    };
+    input.onchange=function(){Module.receiveProgramFile(input.files[0]);};
     input.click();
 });
 EM_JS(void,downloadText,(const char* name,const char* data,int size),{
